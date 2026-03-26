@@ -1,5 +1,5 @@
 import requests
-from telegram.ext import ApplicationBuilder, CommandHandler
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
 from api_bot import bot_token
 from api_bot import api_weather
 from translate import Translator
@@ -14,6 +14,11 @@ url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&units=metric&la
 
 # "Мини-база" с пользователями
 set_users = set()
+
+# "Мини-база" с таймером погоды
+set_time_information = {}
+
+set_waiting_word = {}
 
 auto_task_running = False
 
@@ -109,6 +114,223 @@ async def weather_informated(context):
 
             await asyncio.sleep(65)
 
+async def text_with_add_time(update, context):
+        
+        chat_id = update.effective_chat.id
+
+        # Если флаг ожидания для нас тру:
+        if set_waiting_word[chat_id]:
+
+            # Запоминаю, что ввел пользователь в переменную
+            text_from_user = update.message.text
+
+            # Вызываю функцию, которая проверяет валидность данных времени
+            await check_what_input(text_from_user)
+
+async def check_what_input(text_from_user):
+
+
+
+
+
+
+
+        
+
+
+
+
+async def waiting_to_ask(update, context):
+
+        if set_waiting_word[chat_id] == True:
+
+        # Отладка на всякий случай
+        print("Пользователь ввел: ", text_from_user)
+
+        # Форматирование времени в список: ["09:45", "03:15"]
+        text_formated = text_from_user.split(", ")
+
+        # Заготовка пустого списка для добавления времени
+        formated_time = []
+
+        # Форматирование времени по определенным требованиям: 00:00 > 0:0, 01:00 > 1:0 и т.д.
+        for element in text_formated:
+            if element[0] == "0":
+                element = element[1:5]
+                if element[2] == "0":
+                    element = element[0:2] + element[3:]
+                    formated_time.append(element)
+                else:
+                    formated_time.append(element)
+
+            elif element[3] == "0":
+                element = element[:3] + element[4:]
+                formated_time.append(element)
+
+            else:
+                formated_time.append(element)
+
+        # Проверка, нет ли в списке одного и того же времени?
+        for element_time in formated_time:
+            number_of_counter = formated_time.count(element_time)
+            if number_of_counter != 1:
+                formated_time.remove(element_time)
+
+        # Проверка, есть ли у нас такой пользователь уже с кастомным временем?
+        if chat_id in set_time_information:
+
+            list_add_new_time = []
+            
+            # Проверка, есть ли попытка добавить одно и то же время непосредственно в сам словарь?
+            for key, item in set_time_information.items():
+
+                # Берется один элемент из отформатированного времени
+                for time_formated in formated_time:
+
+                    # Если уже есть:
+                    if time_formated in item:
+
+                        # Пропускаем
+                        continue
+
+                    # Или же 
+                    else:
+                        
+                        # Добавляем элемент
+                        item.append(time_formated)
+                        list_add_new_time.append(time_formated)
+
+            list_add_new_time = ", ".join(list_add_new_time)
+
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f'Время: {list_add_new_time} добавлено список ваших уведомлений!',
+            )
+
+        # Если же у нас нету такого пользователя, то снчала добавим его уникальный user_id
+        # чтобы потом знать, к кому обращаться! 
+        else:
+            set_time_information[chat_id] = formated_time
+
+            formated_time = ", ".join(formated_time)
+
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f'Время: {formated_time} добавлено список ваших уведомлений!',
+            )
+
+
+# Функция, которая отвечает за точечную настройку времени
+async def change_time_information(update, context):
+    
+    chat_id = update.effective_chat.id
+
+    await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f'Пожалуйста, укажите время, когда вы хотите получать информацию о погоде! (можно через ", ")',
+        )
+    
+    # Ставлю флаг для ожидания ввода времени на тру:
+    set_waiting_word[chat_id] = True
+
+    
+
+async def remove_time_information(update, context):
+
+    chat_id = update.effective_chat.id
+
+    if chat_id not in set_time_information:
+
+        await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f'Вы не числитесь в базе пользователей по добавленным временам',
+            )
+    
+    elif set_time_information[chat_id] == []:
+        await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f'Отсутсвует время, которое можно было бы удалить',
+            )
+
+    else:
+
+        await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=f'Пожалуйста, укажите время, которое вы хотите удалить? (можно через " ,")',
+                )
+        
+        # Запоминаю, что ввел пользователь в переменную
+        text_from_user_to_delete = update.message.text
+
+        # Отладка на всякий случай
+        print("Пользователь ввел для удаления: ", text_from_user_to_delete)
+
+        # Форматирование времени в список: ["09:45", "03:15"]
+        text_formated_for_delete = text_from_user_to_delete.split(", ")
+
+        # Заготовка пустого списка для добавления времени
+        formated_time_for_delete = []
+
+        # Форматирование времени по определенным требованиям: 00:00 > 0:0, 01:00 > 1:0 и т.д.
+        for element in text_formated_for_delete:
+            if element[0] == "0":
+                element = element[1:5]
+                if element[2] == "0":
+                    element = element[0:2] + element[3:]
+                    formated_time_for_delete.append(element)
+                else:
+                    formated_time_for_delete.append(element)
+
+            elif element[3] == "0":
+                element = element[:3] + element[4:]
+                formated_time_for_delete.append(element)
+
+            else:
+                formated_time_for_delete.append(element)
+
+        # Проверка, нет ли в списке одного и того же времени?
+        for element_time in formated_time_for_delete:
+            number_of_counter = formated_time_for_delete.count(element_time)
+            if number_of_counter != 1:
+                formated_time_for_delete.remove(element_time)
+
+        # Счетчик для информирования (дальнейшего)
+        list_of_deleted_time = []
+        cnt = 0
+        # Проверяю, есть ли вообще такое время?
+        for element_to_delete in formated_time_for_delete:
+            
+            # Если элемент у нас есть, то удаляем!
+            if element_to_delete in set_time_information[chat_id]:
+                set_time_information[chat_id].remove(element_to_delete)
+                cnt += 1
+                list_of_deleted_time.append(element_to_delete)
+
+            else:
+                continue
+        
+        if cnt > 0:
+            list_of_deleted_time = ", ".join(list_of_deleted_time)
+            await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=f'Время: {list_of_deleted_time} успешно удалено!',
+                )
+        
+        else:
+
+            await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=f'Никакое время не было удалено, так как оно отсутсвует!',
+                )
+
+# Функция которая показывает, на какое время у меня поставлено уведомление?
+async def show_time_dict(update, context):
+
+    chat_id = update.effective_chat.id
+
+    text_of_time = set_time_information[chat_id]
+
+    await context.bot.send_message(chat_id=update.effective_chat.id, text = text_of_time)
 
 # Когда пользователь вводит команду /auto, его юзер айди добавляется в множество, где потом функция берет его юзерайди и он получает сообщение!
 async def start_auto_informated(update, context):
@@ -177,9 +399,28 @@ if __name__ == "__main__":
     TOKEN = bot_token
 
     application = ApplicationBuilder().token(TOKEN).build()
+
+    # СТАРТТТТ!
     application.add_handler(CommandHandler("start", weather))
+
+    # Подписываемся на рассылку
     application.add_handler(CommandHandler("sub", start_auto_informated))
+
+    # Отказываемся от рассылки
     application.add_handler(CommandHandler("uns", stop_information))
 
+    # Добавляем время
+    application.add_handler(CommandHandler("addtime", change_time_information))
+
+    # Удаляем время
+    application.add_handler(CommandHandler("removetime", remove_time_information))
+
+    # Показываем список со всем добавленным временем
+    application.add_handler(CommandHandler("showtime", show_time_dict))
+
+    # Специальный обработчик который слушает только текст (он сделан для добавления времени)
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_with_add_time))
+
+    # Запуск бота
     print("Бот запущен")
     application.run_polling()
